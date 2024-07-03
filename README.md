@@ -1,3 +1,7 @@
+아래는 요청하신 "우리 회사 프로젝트의 깃허브 레포지토리에서 리드미 파일"을 Quantum Jump Club에 맞게 수정한 내용입니다.
+
+---
+
 # QJC_minecraft
 
 # 웹 기반 마인크래프트 클론
@@ -69,4 +73,4 @@
 
 ## 크레딧
 
-이 프로젝트는 [퀀텀점프클럽](https://www.youtube.com/channel/your-channel-id)에 의해 제작되었습니다.
+이 프로젝트는 [Quantum Jump Club](https://www.youtube.com/channel/your-channel-id)에 의해 제작되었습니다. Quantum Jump Club은 혁신적인 기술과 창의성을 바탕으로 다양한 프로젝트를 진행하고 있으며, 웹 기반 게임 개발에 있어서도 최고의 품질을 지향합니다. Quantum Jump Club에 대해 더 알고 싶다면 [여기](https://quantumjumpclub.com)를 방문하세요.
