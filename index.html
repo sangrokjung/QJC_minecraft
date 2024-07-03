@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마인크래프트 클론</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        #instructions {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #gameUI {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: none;
+        }
+        #healthBarContainer {
+            width: 200px;
+            height: 20px;
+            background-color: #333;
+            border: 2px solid #000;
+        }
+        #healthBar {
+            width: 100%;
+            height: 100%;
+            background-color: #ff0000;
+        }
+        #credits {
+            display: none;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            text-align: right;
+            color: white;
+        }
+        
+    </style>
+</head>
+<body>
+    <div id="blocker">
+        <div id="instructions">
+            <img src="https://yt3.googleusercontent.com/QtMinhUxg5UvxqLJ87T6lwuKqovTos23m9uz1iwSsgBvghKYliwAEyA4tsjXNxr9-F1zhPsdEg=w2560-fcrop64=1,00005a57ffffa5a8-k-c0xffffffff-no-nd-rj" alt="게임 시작 이미지" style="width: 300px; height: auto; margin-bottom: 20px;">
+            <p style="font-size:36px">클릭하여 시작</p>
+            <p>마우스: 시점 이동 / WASD: 이동 / 스페이스: 점프</p>
+            <p>좌클릭: 블록 파괴 / 우클릭: 블록 설치</p>
+            <p style="margin-top: 20px;">제작: 퀀텀점프클럽</p>
+        </div>
+    </div>
+    <div id="ui">
+        <div id="health"></div>
+        <div id="level"></div>
+        <div id="inventory"></div>
+    </div>
+    <div id="gameUI">
+        <div id="healthBarContainer">
+            <div id="healthBar"></div>
+        </div>
+        <div id="playerInfo"></div>
+        <div id="inventory"></div>
+    </div>
+    <div id="credits">
+        <p style="margin: 0;">제작 :</p>
+        <img src="https://yt3.googleusercontent.com/QtMinhUxg5UvxqLJ87T6lwuKqovTos23m9uz1iwSsgBvghKYliwAEyA4tsjXNxr9-F1zhPsdEg=w2560-fcrop64=1,00005a57ffffa5a8-k-c0xffffffff-no-nd-rj" alt="제작 이미지" style="width: 100px; height: auto;">
+    </div>
+    
+    
+    <div id="crosshair"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <script>
+        let camera, scene, renderer, controls;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, canJump = false;
+        let prevTime = performance.now();
+        let inventory = {
+            dirt: 0,
+            stone: 0,
+            wood: 0,
+            health_potion: 0
+        };
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        let raycaster;
+        
+        const textureLoader = new THREE.TextureLoader();
+        const zombieTexture = textureLoader.load('png-clipart-minecraft-zombie-apocalypse-mod-mob-minecraft-zombie-angle-author.png');
+        const dirtTexture = textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/minecraft/atlas.png');
+        dirtTexture.magFilter = THREE.NearestFilter;
+        dirtTexture.minFilter = THREE.NearestFilter;
+
+        let monsters = [];
+        let items = [];
+        let playerHealth = 100;
+        let playerLevel = 1;
+        let playerExperience = 0;
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.y = 10;
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            controls = new THREE.PointerLockControls(camera, document.body);
+
+            const blocker = document.getElementById('blocker');
+            const instructions = document.getElementById('instructions');
+
+            instructions.addEventListener('click', function() {
+                controls.lock();
+            });
+
+            controls.addEventListener('lock', function() {
+                instructions.style.display = 'none';
+                blocker.style.display = 'none';
+                document.getElementById('gameUI').style.display = 'block';
+                document.getElementById('credits').style.display = 'block';  // 추가된 코드
+            });
+            
+            controls.addEventListener('unlock', function() {
+                blocker.style.display = 'block';
+                instructions.style.display = '';
+                document.getElementById('gameUI').style.display = 'none';
+                document.getElementById('credits').style.display = 'none';  // 추가된 코드
+            });
+            
+
+            scene.add(controls.getObject());
+
+            const onKeyDown = function(event) {
+                switch (event.code) {
+                    case 'KeyW': moveForward = true; break;
+                    case 'KeyA': moveLeft = true; break;
+                    case 'KeyS': moveBackward = true; break;
+                    case 'KeyD': moveRight = true; break;
+                    case 'Space': if (canJump === true) velocity.y += 350; canJump = false; break;
+                }
+            };
+
+            const onKeyUp = function(event) {
+                switch (event.code) {
+                    case 'KeyW': moveForward = false; break;
+                    case 'KeyA': moveLeft = false; break;
+                    case 'KeyS': moveBackward = false; break;
+                    case 'KeyD': moveRight = false; break;
+                }
+            };
+
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+
+            raycaster = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0), 0, 10);
+
+            // 지형 생성
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshBasicMaterial({ map: dirtTexture });
+            
+            for (let x = -50; x < 50; x++) {
+                for (let z = -50; z < 50; z++) {
+                    const y = Math.floor(Math.random() * 4);
+                    for (let i = 0; i <= y; i++) {
+                        const block = new THREE.Mesh(geometry, material);
+                        block.position.set(x, i, z);
+                        scene.add(block);
+                    }
+                }
+            }
+
+            // 블록 파괴 및 설치
+            document.addEventListener('mousedown', onMouseDown, false);
+
+            // 주기적으로 몬스터 스폰 (예: 10초마다)
+            setInterval(spawnMonster, 10000);
+        }
+
+        function onMouseDown(event) {
+            if (controls.isLocked === true) {
+                raycaster.setFromCamera(new THREE.Vector2(), camera);
+                
+                if (event.button === 0) { // 좌클릭 (몬스터 공격)
+                    const intersects = raycaster.intersectObjects(monsters);
+                    if (intersects.length > 0) {
+                        const hitMonster = intersects[0].object;
+                        hitMonster.health -= 20;
+                        if (hitMonster.health <= 0) {
+                            scene.remove(hitMonster);
+                            monsters = monsters.filter(m => m !== hitMonster);
+                            gainExperience(20);
+                            dropItem(hitMonster.position);
+                        }
+                    }
+                } else if (event.button === 2) { // 우클릭 (블록 설치)
+                    const intersects = raycaster.intersectObjects(scene.children);
+                    if (intersects.length > 0) {
+                        const intersect = intersects[0];
+                        const geometry = new THREE.BoxGeometry(1, 1, 1);
+                        const material = new THREE.MeshBasicMaterial({ map: dirtTexture });
+                        const voxel = new THREE.Mesh(geometry, material);
+                        voxel.position.copy(intersect.point).add(intersect.face.normal);
+                        voxel.position.round();
+                        scene.add(voxel);
+                    }
+                }
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+        
+            if (controls.isLocked === true) {
+                const time = performance.now();
+                const delta = (time - prevTime) / 1000;
+        
+                // 플레이어 움직임 처리
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+                velocity.y -= 9.8 * 100.0 * delta; // 중력 적용
+        
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+        
+                if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
+        
+                controls.moveRight(-velocity.x * delta);
+                controls.moveForward(-velocity.z * delta);
+        
+                controls.getObject().position.y += (velocity.y * delta);
+        
+                // 바닥 충돌 처리
+                if (controls.getObject().position.y < 10) {
+                    velocity.y = 0;
+                    controls.getObject().position.y = 10;
+                    canJump = true;
+                }
+        
+                // 몬스터 업데이트
+                const playerPosition = controls.getObject().position;
+                monsters.forEach(monster => {
+                    monster.update(playerPosition);
+                    
+                    // 플레이어와 몬스터 충돌 감지
+                    if (playerPosition.distanceTo(monster.position) < 2) {
+                        playerHealth -= monster.damage * delta;
+                        console.log("Player hit! Health:", playerHealth.toFixed(2));
+                        if (playerHealth <= 0) {
+                            console.log("Game Over!");
+                            controls.unlock();
+                            // 여기에 게임 오버 처리 로직 추가
+                        }
+                    }
+                });
+        
+                // 아이템 수집 로직
+                items.forEach((item, index) => {
+                    if (playerPosition.distanceTo(item.position) < 1) {
+                        scene.remove(item);
+                        items.splice(index, 1);
+                        if (item.type === 'health_potion') {
+                            playerHealth = Math.min(playerHealth + 20, 100 + (playerLevel - 1) * 20);
+                            console.log("Health restored! Current health:", playerHealth.toFixed(2));
+                            inventory.health_potion++;
+                            updateInventoryUI();
+                        }
+                        // 여기에 다른 아이템 타입에 대한 처리 추가 가능
+                    }
+                });
+        
+                prevTime = time;
+            }
+        
+            // 레이캐스터 업데이트 (블록 상호작용을 위해)
+            raycaster.setFromCamera(new THREE.Vector2(), camera);
+        
+            // UI 업데이트
+            updateUI();
+        
+            // 씬 렌더링
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener('resize', onWindowResize, false);
+
+        class Monster extends THREE.Mesh {
+            constructor(type) {
+                const geometry = new THREE.BoxGeometry(1, 2, 1);
+                let material;
+                
+                switch(type) {
+                    case 'zombie':
+                        material = new THREE.MeshBasicMaterial({ map: zombieTexture });
+                        break;
+                    case 'skeleton':
+                        material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                        break;
+                    case 'creeper':
+                        material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+                        break;
+                    default:
+                        material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+                }
+                
+                super(geometry, material);  // 여기서 super()를 호출합니다.
+                
+                this.type = type;
+                
+                switch(type) {
+                    case 'zombie':
+                        this.health = 100;
+                        this.speed = 0.03;
+                        this.damage = 10;
+                        break;
+                    case 'skeleton':
+                        this.health = 80;
+                        this.speed = 0.04;
+                        this.damage = 15;
+                        break;
+                    case 'creeper':
+                        this.health = 120;
+                        this.speed = 0.02;
+                        this.damage = 40;
+                        break;
+                    default:
+                        this.health = 100;
+                        this.speed = 0.03;
+                        this.damage = 10;
+                }
+            }
+        
+            update(playerPosition) {
+                const direction = new THREE.Vector3()
+                    .subVectors(playerPosition, this.position)
+                    .normalize();
+                this.position.add(direction.multiplyScalar(this.speed));
+            }
+        }
+        
+        
+        function spawnMonster() {
+            const types = ['zombie', 'skeleton', 'creeper'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            const monster = new Monster(type);
+        
+            // 플레이어 주변의 랜덤한 위치에 몬스터 스폰
+            const spawnRadius = 30; // 스폰 반경
+            const spawnAngle = Math.random() * Math.PI * 2; // 0부터 2π 사이의 랜덤한 각도
+            const playerPosition = controls.getObject().position;
+        
+            // 플레이어 위치를 기준으로 원형으로 몬스터 스폰
+            monster.position.set(
+                playerPosition.x + Math.cos(spawnAngle) * spawnRadius,
+                playerPosition.y,
+                playerPosition.z + Math.sin(spawnAngle) * spawnRadius
+            );
+        
+            // 지형 위에 몬스터 위치시키기
+            raycaster.ray.origin.copy(monster.position);
+            raycaster.ray.origin.y = 100; // 충분히 높은 위치에서 시작
+            raycaster.ray.direction.set(0, -1, 0); // 아래 방향으로 레이캐스트
+        
+            const intersects = raycaster.intersectObjects(scene.children);
+            if (intersects.length > 0) {
+                monster.position.y = intersects[0].point.y + 1; // 지형 위 1 유닛 위에 위치
+            } else {
+                monster.position.y = 0; // 교차점이 없으면 y=0에 위치
+            }
+        
+            scene.add(monster);
+            monsters.push(monster);
+        
+            console.log(`Spawned a ${type} at position:`, monster.position);
+        }
+        
+
+        class Item extends THREE.Mesh {
+            constructor(type) {
+                const geometry = new THREE.SphereGeometry(0.2, 32, 32);
+                const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                super(geometry, material);
+                this.type = type;
+            }
+        }
+        
+        function dropItem(position) {
+            const item = new Item('health_potion');
+            item.position.copy(position);
+            scene.add(item);
+            items.push(item);
+        }
+    
+        function updateInventoryUI() {
+            const inventoryElement = document.getElementById('inventory');
+            inventoryElement.innerHTML = '';
+            for (let [item, count] of Object.entries(inventory)) {
+                const itemElement = document.createElement('div');
+                itemElement.textContent = `${item}: ${count}`;
+                inventoryElement.appendChild(itemElement);
+            }
+        }
+
+        function updateUI() {
+            const gameUI = document.getElementById('gameUI');
+            const healthBar = document.getElementById('healthBar');
+            const playerInfo = document.getElementById('playerInfo');
+            const inventoryDiv = document.getElementById('inventory');
+        
+            // 체력바 업데이트
+            const maxHealth = 100 + (playerLevel - 1) * 20;
+            const healthPercentage = (playerHealth / maxHealth) * 100;
+            healthBar.style.width = `${healthPercentage}%`;
+            
+            // 체력에 따라 색상 변경
+            if (healthPercentage > 50) {
+                healthBar.style.backgroundColor = `rgb(${255 - (healthPercentage - 50) * 5.1}, 255, 0)`;
+            } else {
+                healthBar.style.backgroundColor = `rgb(255, ${healthPercentage * 5.1}, 0)`;
+            }
+        
+            // 플레이어 정보 업데이트
+            playerInfo.innerHTML = `
+                레벨: ${playerLevel}<br>
+                경험치: ${playerExperience}/${playerLevel * 100}<br>
+                체력: ${playerHealth.toFixed(1)}/${maxHealth}
+            `;
+        
+            // 인벤토리 업데이트
+            inventoryDiv.innerHTML = '인벤토리:<br>';
+            for (const [item, count] of Object.entries(inventory)) {
+                if (count > 0) {
+                    inventoryDiv.innerHTML += `${item}: ${count}<br>`;
+                }
+            }
+        
+            // 게임 상태에 따른 UI 표시/숨김
+            gameUI.style.display = controls.isLocked ? 'block' : 'none';
+        }
+
+        function gainExperience(amount) {
+            playerExperience += amount;
+            if (playerExperience >= playerLevel * 100) {
+                playerLevel++;
+                playerExperience = 0;
+                playerHealth = 100 + (playerLevel - 1) * 20;
+                console.log(`Level Up! You are now level ${playerLevel}`);
+            }
+        }
+    </script>
+</body>
+</html>
