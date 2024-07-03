@@ -4,6 +4,8 @@
 
 이 프로젝트는 Three.js를 사용하여 브라우저에서 실행되는 간단한 마인크래프트 스타일의 게임을 구현한 것입니다. 플레이어는 3D 환경에서 이동하고, 블록을 파괴하거나 설치할 수 있으며, 몬스터와 상호작용할 수 있습니다.
 
+**[여기](https://ephemeral-cobbler-a597b5.netlify.app/)에서 직접 실행해 보세요.**
+
 ## 주요 기능
 
 - 3D 환경에서의 자유로운 이동 및 시점 변경
@@ -70,3 +72,5 @@
 ## 크레딧
 
 이 프로젝트는 [Quantum Jump Club](https://www.youtube.com/@qjc_qjc/featured)에 의해 제작되었습니다. Quantum Jump Club은 혁신적인 기술과 창의성을 바탕으로 다양한 프로젝트를 진행하고 있으며, 웹 기반 게임 개발에 있어서도 최고의 품질을 지향합니다. Quantum Jump Club에 대해 더 알고 싶다면 [여기](https://www.youtube.com/@qjc_qjc/featured)를 방문하세요.
+
+---
